@@ -1,20 +1,23 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.views.generic import ListView, DetailView
 
 from .models import Post, Comment
 from .forms import PostForm, CommentForm
 
 # Create your views here.
 
-def post_list(request):
-    latest_posts = Post.objects.filter(published_date__lte=timezone.now()).order_by('-published_date')[:5]
-    return render(request, 'blog/post_list.html', {'posts': latest_posts})
+class PostListView(ListView):
+    model = Post
+    context_object_name = "published_post_list"
+    queryset = Post.objects.filter(published_date__lte=timezone.now()).order_by('-published_date')
+    paginate_by = 2
 
 
-def detail(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    return render(request, "blog/detail.html", {"post": post})
+class PostDetailView(DetailView):
+    model = Post
+    template_name = "blog/detail.html"
 
 
 @login_required
