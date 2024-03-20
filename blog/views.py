@@ -1,18 +1,30 @@
-from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse_lazy
 from django.utils import timezone
-from django.views.generic import ListView, DetailView
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    UpdateView,
+)
 
-from .models import Post, Comment
-from .forms import PostForm, CommentForm
+from .forms import CommentForm, PostForm
+from .models import Comment, Post
 
 # Create your views here.
 
 class PostListView(ListView):
-    model = Post
-    context_object_name = "published_post_list"
     queryset = Post.objects.filter(published_date__lte=timezone.now()).order_by('-published_date')
     paginate_by = 2
+
+
+class DraftPostListView(LoginRequiredMixin, ListView):
+    queryset = Post.objects.filter(published_date__isnull=True).order_by('created_date')
+    paginate_by = 2
+    template_name = "blog/post_draft_list.html"
 
 
 class PostDetailView(DetailView):
@@ -20,55 +32,39 @@ class PostDetailView(DetailView):
     template_name = "blog/detail.html"
 
 
-@login_required
-def post_new(request):
-    if request.method == "POST":
-        form = PostForm(request.POST)
-        if form.is_valid():
-            post = form.save(commit=False)
-            post.author = request.user
-            # post.published_date = timezone.now()
-            post.save()
-            return redirect('blog:detail', post_id=post.id) # kwargs here need to match what is used in urls.py - no magic
-    else:
-        form = PostForm()
-    return render(request, 'blog/post_edit.html', {'form': form})
+class PostCreateView(LoginRequiredMixin, CreateView):
+    model = Post
+    fields = ['title', 'text']
+    template_name = "blog/post_edit.html"
+
+    def form_valid(self, form):
+        # update post author to match current user
+        form.instance.author = self.request.user
+        return super().form_valid(form)
 
 
-@login_required
-def post_edit(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    if request.method == "POST":
-        form = PostForm(request.POST, instance=post)
-        if form.is_valid():
-            post = form.save(commit=False)
-            post.author = request.user
-            # post.published_date = timezone.now()
-            post.save()
-            return redirect('blog:detail', post_id=post.id)
-    else:
-        form = PostForm(instance=post)
-    return render(request, 'blog/post_edit.html', {'form': form})
+class PostUpdateView(LoginRequiredMixin, UpdateView):
+    model = Post
+    fields = ['title', 'text']
+    template_name = "blog/post_edit.html"
+
+    def form_valid(self, form):
+        # update post author to match current user
+        form.instance.author = self.request.user
+        return super().form_valid(form) 
 
 
-@login_required
-def post_draft_list(request):
-    posts = Post.objects.filter(published_date__isnull=True).order_by('created_date')
-    return render(request, 'blog/post_draft_list.html', {'posts': posts})
+class PostDeleteView(LoginRequiredMixin, DeleteView):
+    model = Post
+    success_url = reverse_lazy("blog:post_list")
 
 
 @login_required
 def post_publish(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     post.publish()
-    return redirect('blog:detail', post_id=post_id)
+    return redirect('blog:detail', pk=post_id)
 
-
-@login_required
-def post_remove(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    post.delete()
-    return redirect('blog:post_list')
 
 
 def add_comment_to_post(request, post_id):
@@ -79,7 +75,7 @@ def add_comment_to_post(request, post_id):
             comment = form.save(commit=False)
             comment.post = post
             comment.save()
-            return redirect('blog:detail', post_id=post.id)
+            return redirect('blog:detail', pk=post.id)
     else:
         form = CommentForm()
     return render(request, 'blog/add_comment_to_post.html', {'form': form})
@@ -89,10 +85,10 @@ def add_comment_to_post(request, post_id):
 def comment_approve(request, post_id):
     comment = get_object_or_404(Comment, pk=post_id)
     comment.approve()
-    return redirect('blog:detail', post_id=comment.post.id)
+    return redirect('blog:detail', pk=comment.post.id)
 
 @login_required
 def comment_remove(request, post_id):
     comment = get_object_or_404(Comment, pk=post_id)
     comment.delete()
-    return redirect('blog:detail', post_id=comment.post.id)
+    return redirect('blog:detail', pk=comment.post.id)
