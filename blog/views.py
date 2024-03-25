@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -30,6 +31,20 @@ class DraftPostListView(LoginRequiredMixin, ListView):
 class PostDetailView(DetailView):
     model = Post
     template_name = "blog/detail.html"
+
+    def get_object(self):
+        """
+        Hides unpublished posts unless user is logged in. 
+        """
+        # call default method to get object based on request, then check if post is published or user is logged in
+        obj = super().get_object()
+        if obj.published_date:
+            return obj
+        elif self.request.user.is_authenticated:
+            return obj
+        else:
+            raise Http404("No post found matching the query")
+
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):

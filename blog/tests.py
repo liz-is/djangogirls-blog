@@ -28,8 +28,7 @@ def create_post(title="A Title", text="here is some text"):
     Creates a post with the given `title` and `text` and an author with the username "test".
     The post is unpublished.
     """
-    user = User(username="test", password="")
-    user.save()
+    user = User.objects.create_user(username="test", password="secret")
     return Post.objects.create(author=user, title=title, text=text)
 
 
@@ -46,11 +45,11 @@ class PostModelTests(TestCase):
         self.assertEqual(blog_post.published_date, time_now)
 
 
-class PostIndexViewTests(TestCase):
+class PostListViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         # Create 3 posts for pagination tests
-        user = User.objects.create(username="test", password="")
+        user = User.objects.create_user(username="test", password="secret")
 
         cls.post3 = Post.objects.create(
             author=user, title="Post 3", text="post text goes here"
@@ -124,3 +123,53 @@ class PostIndexViewTests(TestCase):
         self.assertIn(self.post1, post_list)
         self.assertNotIn(self.unpublished_post, post_list)
         self.assertQuerySetEqual([self.post1], post_list)
+
+    def test_draft_posts__require_login(self):
+        response = self.client.get(reverse("blog:post_draft_list"))
+        self.assertRedirects(response, '/accounts/login/?next=/drafts/')
+
+    def test_draft_posts_displayed(self):
+        """
+        Test that unpublished posts are visible to the logged-in user.
+        """
+        self.assertTrue(self.client.login(username = "test", password = "secret"))
+        response = self.client.get(reverse("blog:post_draft_list"))
+        self.assertEqual(response.status_code, 200)
+        post_list = response.context["post_list"]
+        self.assertNotIn(self.post1, post_list)
+        self.assertIn(self.unpublished_post, post_list)
+        self.assertQuerySetEqual([self.unpublished_post], post_list)
+
+
+class PostDetailViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # Create 3 posts for pagination tests
+        user = User.objects.create_user(username="test", password="secret")
+
+        cls.published_post = Post.objects.create(
+            author=user, title="Post", text="post text goes here"
+        )
+        cls.published_post.publish(date=timezone.now() - datetime.timedelta(hours=1))
+
+        cls.unpublished_post = Post.objects.create(
+            author=user, title="Unpublished post", text="should not appear"
+        )
+
+    def test_post_detail_view(self):
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['post'], self.published_post)
+        
+
+    def test_post_draft_detail_view(self):
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 2}))
+        self.assertEqual(response.status_code, 404)
+        # test post that doesn't exist yet
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 3}))
+        self.assertEqual(response.status_code, 404)
+        # log in and try again
+        self.assertTrue(self.client.login(username = "test", password = "secret"))
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 2}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['post'], self.unpublished_post)
