@@ -12,7 +12,7 @@ from django.views.generic import (
     UpdateView,
 )
 
-from .forms import CommentForm, PostForm
+from .forms import CommentForm
 from .models import Comment, Post
 
 # Create your views here.
