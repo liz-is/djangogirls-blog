@@ -7,11 +7,6 @@ from django.utils import timezone
 
 from .models import Comment, Post
 
-# Create your tests here.
-
-# test index/homepage view
-# response if there are no posts?
-# number of comments are correct?
 
 # Test Models ---------------------------------------------------------------------------
 
@@ -165,6 +160,22 @@ class PostListViewTests(TestCase):
         self.assertNotIn(self.post1, post_list)
         self.assertIn(self.unpublished_post, post_list)
         self.assertQuerySetEqual([self.unpublished_post], post_list)
+
+    def test_comments_displayed(self):
+        """
+        Test that the number of comments for a post is correctly shown in list view.
+        """
+        response = self.client.get(reverse("blog:post_list"))
+        self.assertContains(response, "Comments: 0")
+        comment = Comment.objects.create(
+            post=self.post3, author="me", text="here is a comment"
+        )
+        comment.approve()
+        response = self.client.get(reverse("blog:post_list"))
+        self.assertContains(response, "Comments: 1")
+        # the other post on this page still has no comments
+        self.assertContains(response, "Comments: 0")
+        # is there a better way to do this that associates comments with the specific post?
 
 
 class PostDetailViewTests(TestCase):
