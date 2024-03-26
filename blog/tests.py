@@ -25,7 +25,6 @@ from .models import Post, Comment
 
 # Test Models ---------------------------------------------------------------------------
 
-
 def create_post(title="A Title", text="here is some text"):
     """
     Creates a post with the given `title` and `text` and an author with the username "test".
@@ -36,6 +35,9 @@ def create_post(title="A Title", text="here is some text"):
 
 
 def create_comment(author = "me", text = "a comment"):
+    """
+    Creates a comment with the given `author` and `text`, that is unapproved. 
+    """
     post = create_post()
     return Comment.objects.create(post = post, author = author, text = text)
 
@@ -255,32 +257,6 @@ class CommentViewTests(TestCase):
         self.assertContains(response, comment_text)
 
 
-class CommentFormTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        user = User.objects.create_user(username="test", password="secret")
-
-        cls.post = Post.objects.create(
-            author=user, title="A post", text="post text goes here"
-        )
-        cls.post.publish()
-
-    def test_redirects_to_post_on_success(self):
-        response = self.client.post(reverse("blog:add_comment_to_post", kwargs={"pk": 1}),
-                                    {"author": "me",
-                                     "text": "comment text goes here"})
-        self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": 1}))
-
-    def test_comment_form_invalid_if_empty_fields(self):
-        # I'm not sure where the default error message is defined
-        # The message that appears in the browser is actually "Please fill in this field."!
-        # But at least this tests whether there's an error or not
-        response = self.client.post(reverse("blog:add_comment_to_post", kwargs={"pk": 1}),
-                                    {"author": "",
-                                     "text": ""})
-        self.assertFormError(response.context['form'], field='author', errors='This field is required.')
-        self.assertFormError(response.context['form'], field='text', errors='This field is required.')
-
 class CommentApproveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -318,3 +294,94 @@ class CommentApproveTests(TestCase):
         self.assertNotContains(response, comment.text)
         self.assertContains(response, "No comments here yet :(")
 
+
+# Test Forms ---------------------------------------------------------------------------
+
+class PostFormTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="test", password="secret")
+
+        cls.post = Post.objects.create(
+            author=cls.user, title="A post", text="post text goes here"
+        )
+        cls.post.publish()
+
+    def test_only_logged_in_users_can_create_posts(self):
+        response = self.client.get(reverse("blog:post_new"))
+        self.assertRedirects(response, "/accounts/login/?next=/post/new/")
+        self.assertTrue(self.client.login(username="test", password="secret"))
+        response = self.client.get(reverse("blog:post_new"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "blog/post_edit.html")
+
+    def test_only_logged_in_users_can_edit_posts(self):
+        post_id = self.post.id
+        response = self.client.get(reverse("blog:post_edit", kwargs={"pk": post_id}))
+        self.assertRedirects(response, f"/accounts/login/?next=/post/{post_id}/edit/")
+        self.assertTrue(self.client.login(username="test", password="secret"))
+        response = self.client.get(reverse("blog:post_edit", kwargs={"pk": post_id}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "blog/post_edit.html")
+
+    def test_post_form_invalid_if_empty_fields(self):
+        # I'm not sure where the default error message is defined
+        # The message that appears in the browser is actually "Please fill in this field."!
+        # But at least this tests whether there's an error or not
+        self.assertTrue(self.client.login(username="test", password="secret"))
+        response = self.client.post(reverse("blog:post_new"),
+                                    {"title": "",
+                                     "text": ""})
+        self.assertFormError(response.context['form'], field='title', errors='This field is required.')
+        self.assertFormError(response.context['form'], field='text', errors='This field is required.')
+        
+    def test_post_author_is_current_user(self):
+        self.assertTrue(self.client.login(username="test", password="secret"))
+        response = self.client.post(reverse("blog:post_new"),
+                                    {"title": "A title",
+                                     "text": "Some text"}, follow=True) # follow redirect
+        self.assertEqual(str(response.context['post'].author), 'test')
+        # edit the first post
+        post_id = self.post.id
+        response = self.client.post(reverse("blog:post_edit", kwargs={"pk": post_id}),
+                                    {"title": "A title",
+                                     "text": "Some text"}, follow=True)
+        self.assertEqual(str(response.context['post'].author), 'test')
+
+    def test_only_logged_in_users_can_publish(self):
+        new_post = Post.objects.create(author = self.user, title = "title", text = "post text goes here")
+        response = self.client.get(reverse("blog:post_publish", kwargs={"pk": new_post.id}))
+        self.assertRedirects(response, f"/accounts/login/?next=/post/{new_post.id}/publish/")
+        # log in and try again
+        self.assertTrue(self.client.login(username="test", password="secret"))
+        response = self.client.get(reverse("blog:post_publish", kwargs={"pk": new_post.id}))
+        self.assertRedirects(response, f"/{new_post.id}/")
+        response = self.client.get(reverse("blog:post_publish", kwargs={"pk": new_post.id}), follow=True)
+        self.assertEqual(response.context['post'].published_date.date(), timezone.now().date())
+
+
+class CommentFormTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user = User.objects.create_user(username="test", password="secret")
+
+        cls.post = Post.objects.create(
+            author=user, title="A post", text="post text goes here"
+        )
+        cls.post.publish()
+
+    def test_redirects_to_post_on_success(self):
+        response = self.client.post(reverse("blog:add_comment_to_post", kwargs={"pk": 1}),
+                                    {"author": "me",
+                                     "text": "comment text goes here"})
+        self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": 1}))
+
+    def test_comment_form_invalid_if_empty_fields(self):
+        # I'm not sure where the default error message is defined
+        # The message that appears in the browser is actually "Please fill in this field."!
+        # But at least this tests whether there's an error or not
+        response = self.client.post(reverse("blog:add_comment_to_post", kwargs={"pk": 1}),
+                                    {"author": "",
+                                     "text": ""})
+        self.assertFormError(response.context['form'], field='author', errors='This field is required.')
+        self.assertFormError(response.context['form'], field='text', errors='This field is required.')
