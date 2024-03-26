@@ -205,3 +205,12 @@ class PostDetailViewTests(TestCase):
         response = self.client.get(reverse("blog:detail", kwargs={"pk": 2}))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['post'], self.unpublished_post)
+
+
+class CommentViewTests(TestCase):
+    def test_add_comment(self):
+        post = create_post()
+        response = self.client.get(reverse("blog:add_comment_to_post", kwargs={"pk": 1}))
+        self.assertEqual(response.status_code, 200)
+        
+    

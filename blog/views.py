@@ -75,15 +75,15 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
 
 
 @login_required
-def post_publish(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
+def post_publish(request, pk):
+    post = get_object_or_404(Post, pk=pk)
     post.publish()
-    return redirect('blog:detail', pk=post_id)
+    return redirect('blog:detail', pk=pk)
 
 
 
-def add_comment_to_post(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
+def add_comment_to_post(request, pk):
+    post = get_object_or_404(Post, pk=pk)
     if request.method == "POST":
         form = CommentForm(request.POST)
         if form.is_valid():
@@ -97,13 +97,13 @@ def add_comment_to_post(request, post_id):
 
 
 @login_required
-def comment_approve(request, post_id):
-    comment = get_object_or_404(Comment, pk=post_id)
+def comment_approve(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
     comment.approve()
     return redirect('blog:detail', pk=comment.post.id)
 
 @login_required
-def comment_remove(request, post_id):
-    comment = get_object_or_404(Comment, pk=post_id)
+def comment_remove(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
     comment.delete()
     return redirect('blog:detail', pk=comment.post.id)
