@@ -5,7 +5,7 @@ from django.urls import reverse
 
 import datetime
 
-from .models import Post
+from .models import Post, Comment
 
 # Create your tests here.
 
@@ -23,6 +23,9 @@ from .models import Post
 # test comment approval process?
 
 
+# Test Models ---------------------------------------------------------------------------
+
+
 def create_post(title="A Title", text="here is some text"):
     """
     Creates a post with the given `title` and `text` and an author with the username "test".
@@ -32,11 +35,15 @@ def create_post(title="A Title", text="here is some text"):
     return Post.objects.create(author=user, title=title, text=text)
 
 
+def create_comment(author = "me", text = "a comment"):
+    post = create_post()
+    return Comment.objects.create(post = post, author = author, text = text)
+
+
 class PostModelTests(TestCase):
     """
     Test that publishing a post sets its `published_date` field to today's date.
     """
-
     def test_publish_post(self):
         blog_post = create_post()
         self.assertIsNone(blog_post.published_date)
@@ -44,6 +51,31 @@ class PostModelTests(TestCase):
         blog_post.publish(date=time_now)
         self.assertEqual(blog_post.published_date, time_now)
 
+    def test_str(self):
+        title = "This is my title"
+        blog_post = create_post(title=title)
+        self.assertEqual(str(blog_post), title)
+
+    def test_get_absolute_url(self):
+        blog_post = create_post()
+        self.assertEqual(blog_post.get_absolute_url(), "/1/")
+
+
+class CommentModelTests(TestCase):
+   
+    def test_str(self):
+        text = "This is the comment text"
+        comment = create_comment(text=text)
+        self.assertEqual(str(comment), text)
+
+    def test_comment_approval(self):
+        comment = create_comment()
+        self.assertFalse(comment.approved_comment)
+        comment.approve()
+        self.assertTrue(comment.approved_comment)
+
+
+# Test Views ---------------------------------------------------------------------------
 
 class PostListViewTests(TestCase):
     @classmethod
