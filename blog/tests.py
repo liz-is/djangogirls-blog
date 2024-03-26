@@ -193,7 +193,6 @@ class PostDetailViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['post'], self.published_post)
         
-
     def test_post_draft_detail_view(self):
         response = self.client.get(reverse("blog:detail", kwargs={"pk": 2}))
         self.assertEqual(response.status_code, 404)
@@ -208,9 +207,114 @@ class PostDetailViewTests(TestCase):
 
 
 class CommentViewTests(TestCase):
-    def test_add_comment(self):
-        post = create_post()
+    @classmethod
+    def setUpTestData(cls):
+        user = User.objects.create_user(username="test", password="secret")
+
+        cls.post = Post.objects.create(
+            author=user, title="A post", text="post text goes here"
+        )
+        cls.post.publish()
+
+    def test_add_comment_page_exists(self):
         response = self.client.get(reverse("blog:add_comment_to_post", kwargs={"pk": 1}))
         self.assertEqual(response.status_code, 200)
-        
+        self.assertTemplateUsed(response, 'blog/add_comment_to_post.html')
+
+    def test_no_comments_message(self):
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertContains(response, "No comments here yet :(")
+        # create comment and check visibility
+        comment_text = "this is my comment text"
+        Comment.objects.create(post = self.post, author = "me", text = comment_text)
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertNotContains(response, comment_text)
+        self.assertContains(response, "No comments here yet :(")
+
+    def test_logged_in_user_comment_visibility(self):
+        comment_text = "this is my comment text"
+        comment = Comment.objects.create(post = self.post, author = "me", text = comment_text)
+        # log in and can see comment
+        self.assertTrue(self.client.login(username = "test", password = "secret"))
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertContains(response, comment_text)
+        # can see approved comments too
+        comment.approve()
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertContains(response, comment_text)
+
+    def test_logged_out_user_comment_visibility(self):
+        comment_text = "this is my comment text"
+        comment = Comment.objects.create(post = self.post, author = "me", text = comment_text)
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        # can't see comment
+        self.assertNotContains(response, comment_text)
+        # logged out user can see approved comments
+        comment.approve()
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertContains(response, comment_text)
+
+
+class CommentFormTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user = User.objects.create_user(username="test", password="secret")
+
+        cls.post = Post.objects.create(
+            author=user, title="A post", text="post text goes here"
+        )
+        cls.post.publish()
+
+    def test_redirects_to_post_on_success(self):
+        response = self.client.post(reverse("blog:add_comment_to_post", kwargs={"pk": 1}),
+                                    {"author": "me",
+                                     "text": "comment text goes here"})
+        self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": 1}))
+
+    def test_comment_form_invalid_if_empty_fields(self):
+        # I'm not sure where the default error message is defined
+        # The message that appears in the browser is actually "Please fill in this field."!
+        # But at least this tests whether there's an error or not
+        response = self.client.post(reverse("blog:add_comment_to_post", kwargs={"pk": 1}),
+                                    {"author": "",
+                                     "text": ""})
+        self.assertFormError(response.context['form'], field='author', errors='This field is required.')
+        self.assertFormError(response.context['form'], field='text', errors='This field is required.')
+
+class CommentApproveTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user = User.objects.create_user(username="test", password="secret")
+
+        cls.post = Post.objects.create(
+            author=user, title="A post", text="post text goes here"
+        )
+        cls.post.publish()
+        cls.comment = Comment.objects.create(post = cls.post, author = "me", text = "A comment")
     
+    def test_comment_approve(self):
+        self.assertTrue(self.client.login(username = "test", password = "secret"))
+        detail_response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        # is there a better way to do this?
+        post_id = detail_response.context['post'].id
+        comment = Comment.objects.get(post = post_id)
+        response = self.client.post(reverse("blog:comment_approve", kwargs={"pk": comment.id}))
+        self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": post_id}))
+        # check that approved comment is now visible when logged out
+        self.client.logout()
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertContains(response, comment.text)
+
+    def test_comment_delete(self):
+        self.assertTrue(self.client.login(username = "test", password = "secret"))
+        detail_response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        # is there a better way to do this?
+        post_id = detail_response.context['post'].id
+        comment = Comment.objects.get(post = post_id)
+        response = self.client.post(reverse("blog:comment_remove", kwargs={"pk": comment.id}))
+        self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": post_id}))
+        # check that deleted comment is not visible
+        response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
+        self.assertNotContains(response, comment.text)
+        self.assertContains(response, "No comments here yet :(")
+

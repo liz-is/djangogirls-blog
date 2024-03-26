@@ -45,6 +45,9 @@
         <p>{{ comment.text|linebreaks }}</p>
     </div>
     {% endif %}
+    {% if not comment.approved_comment and not user.is_authenticated %}
+        <p>No comments here yet :(</p>
+    {% endif %}
 {% empty %}
     <p>No comments here yet :(</p>
 {% endfor %}
