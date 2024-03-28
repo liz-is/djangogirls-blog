@@ -26,5 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     - name: Run Tests
+      env:
+        DJANGO_SECRET_KEY: 697369c1f6901603b9dc6470fbe45b871cba9c5328d42a2b6c
       run: |
         python manage.py test
