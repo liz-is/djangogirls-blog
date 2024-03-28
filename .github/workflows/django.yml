@@ -28,5 +28,6 @@ jobs:
     - name: Run Tests
       env:
         DJANGO_SECRET_KEY: 697369c1f6901603b9dc6470fbe45b871cba9c5328d42a2b6c
+        DJANGO_DEBUG: TRUE
       run: |
         python manage.py test
