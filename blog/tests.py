@@ -72,19 +72,13 @@ class PostListViewTests(TestCase):
         # Create 3 posts for pagination tests
         user = User.objects.create_user(username="test", password="secret")
 
-        cls.post3 = Post.objects.create(
-            author=user, title="Post 3", text="post text goes here"
-        )
+        cls.post3 = Post.objects.create(author=user, title="Post 3", text="post text goes here")
         cls.post3.publish()
 
-        cls.post1 = Post.objects.create(
-            author=user, title="Post 1", text="post text goes here"
-        )
+        cls.post1 = Post.objects.create(author=user, title="Post 1", text="post text goes here")
         cls.post1.publish(date=timezone.now() - datetime.timedelta(days=1))
 
-        cls.post2 = Post.objects.create(
-            author=user, title="Post 2", text="post text goes here"
-        )
+        cls.post2 = Post.objects.create(author=user, title="Post 2", text="post text goes here")
         cls.post2.publish(date=timezone.now() - datetime.timedelta(hours=1))
 
         cls.unpublished_post = Post.objects.create(
@@ -167,9 +161,7 @@ class PostListViewTests(TestCase):
         """
         response = self.client.get(reverse("blog:post_list"))
         self.assertContains(response, "Comments: 0")
-        comment = Comment.objects.create(
-            post=self.post3, author="me", text="here is a comment"
-        )
+        comment = Comment.objects.create(post=self.post3, author="me", text="here is a comment")
         comment.approve()
         response = self.client.get(reverse("blog:post_list"))
         self.assertContains(response, "Comments: 1")
@@ -219,15 +211,11 @@ class CommentViewTests(TestCase):
     def setUpTestData(cls):
         user = User.objects.create_user(username="test", password="secret")
 
-        cls.post = Post.objects.create(
-            author=user, title="A post", text="post text goes here"
-        )
+        cls.post = Post.objects.create(author=user, title="A post", text="post text goes here")
         cls.post.publish()
 
     def test_add_comment_page_exists(self):
-        response = self.client.get(
-            reverse("blog:add_comment_to_post", kwargs={"pk": 1})
-        )
+        response = self.client.get(reverse("blog:add_comment_to_post", kwargs={"pk": 1}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "blog/add_comment_to_post.html")
 
@@ -273,13 +261,9 @@ class CommentApproveTests(TestCase):
     def setUpTestData(cls):
         user = User.objects.create_user(username="test", password="secret")
 
-        cls.post = Post.objects.create(
-            author=user, title="A post", text="post text goes here"
-        )
+        cls.post = Post.objects.create(author=user, title="A post", text="post text goes here")
         cls.post.publish()
-        cls.comment = Comment.objects.create(
-            post=cls.post, author="me", text="A comment"
-        )
+        cls.comment = Comment.objects.create(post=cls.post, author="me", text="A comment")
 
     def test_comment_approve(self):
         """
@@ -290,9 +274,7 @@ class CommentApproveTests(TestCase):
         # is there a better way to do this?
         post_id = detail_response.context["post"].id
         comment = Comment.objects.get(post=post_id)
-        response = self.client.post(
-            reverse("blog:comment_approve", kwargs={"pk": comment.id})
-        )
+        response = self.client.post(reverse("blog:comment_approve", kwargs={"pk": comment.id}))
         self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": post_id}))
         # check that approved comment is now visible when logged out
         self.client.logout()
@@ -308,9 +290,7 @@ class CommentApproveTests(TestCase):
         # is there a better way to do this?
         post_id = detail_response.context["post"].id
         comment = Comment.objects.get(post=post_id)
-        response = self.client.post(
-            reverse("blog:comment_remove", kwargs={"pk": comment.id})
-        )
+        response = self.client.post(reverse("blog:comment_remove", kwargs={"pk": comment.id}))
         self.assertRedirects(response, reverse("blog:detail", kwargs={"pk": post_id}))
         # check that deleted comment is not visible
         response = self.client.get(reverse("blog:detail", kwargs={"pk": 1}))
@@ -326,9 +306,7 @@ class PostFormTests(TestCase):
     def setUpTestData(cls):
         cls.user = User.objects.create_user(username="test", password="secret")
 
-        cls.post = Post.objects.create(
-            author=cls.user, title="A post", text="post text goes here"
-        )
+        cls.post = Post.objects.create(author=cls.user, title="A post", text="post text goes here")
         cls.post.publish()
 
     def test_only_logged_in_users_can_create_posts(self):
@@ -388,27 +366,17 @@ class PostFormTests(TestCase):
         """
         Test that logged-in user can publish posts but logged-out user gets redirected to login page.
         """
-        new_post = Post.objects.create(
-            author=self.user, title="title", text="post text goes here"
-        )
-        response = self.client.get(
-            reverse("blog:post_publish", kwargs={"pk": new_post.id})
-        )
-        self.assertRedirects(
-            response, f"/accounts/login/?next=/post/{new_post.id}/publish/"
-        )
+        new_post = Post.objects.create(author=self.user, title="title", text="post text goes here")
+        response = self.client.get(reverse("blog:post_publish", kwargs={"pk": new_post.id}))
+        self.assertRedirects(response, f"/accounts/login/?next=/post/{new_post.id}/publish/")
         # log in and try again
         self.assertTrue(self.client.login(username="test", password="secret"))
-        response = self.client.get(
-            reverse("blog:post_publish", kwargs={"pk": new_post.id})
-        )
+        response = self.client.get(reverse("blog:post_publish", kwargs={"pk": new_post.id}))
         self.assertRedirects(response, f"/{new_post.id}/")
         response = self.client.get(
             reverse("blog:post_publish", kwargs={"pk": new_post.id}), follow=True
         )
-        self.assertEqual(
-            response.context["post"].published_date.date(), timezone.now().date()
-        )
+        self.assertEqual(response.context["post"].published_date.date(), timezone.now().date())
 
 
 class CommentFormTests(TestCase):
@@ -416,9 +384,7 @@ class CommentFormTests(TestCase):
     def setUpTestData(cls):
         user = User.objects.create_user(username="test", password="secret")
 
-        cls.post = Post.objects.create(
-            author=user, title="A post", text="post text goes here"
-        )
+        cls.post = Post.objects.create(author=user, title="A post", text="post text goes here")
         cls.post.publish()
 
     def test_redirects_to_post_on_success(self):
