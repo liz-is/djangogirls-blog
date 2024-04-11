@@ -1,0 +1,24 @@
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - staticfiles:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  web:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - staticfiles:/app/static
+    env_file: .env
+
+volumes:
+  caddy_data:
+  caddy_config:
+  staticfiles:
