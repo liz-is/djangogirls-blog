@@ -1,4 +1,4 @@
-localhost
+localhost, 10.211.117.115
 
 # Use self-signed certificate
 # TODO provide location of production certificate
