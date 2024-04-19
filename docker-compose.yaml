@@ -1,21 +1,20 @@
-version: '2.4'
+version: '3.8'
 
 services:
-  caddy:
-    image: caddy:2
+  nginx:
+    build: ./nginx
     restart: unless-stopped
-    ports:
-      - 80:80
-      - 443:443
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
-      - staticfiles:/srv/static:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
+      - staticfiles:/app/static
+    ports:
+      - 1337:80
+    depends_on:
+      - web
   web:
     build: .
     restart: unless-stopped
+    expose:
+      - 8000
     volumes:
       - staticfiles:/app/static
     env_file: .env
