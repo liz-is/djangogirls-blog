@@ -1,4 +1,8 @@
-localhost, 10.211.117.115
+{
+	auto_https off
+}
+
+localhost, 10.211.117.115, djangoblog.sites.er.kcl.ac.uk
 
 # Use self-signed certificate
 # TODO provide location of production certificate
